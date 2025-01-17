@@ -1,0 +1,8 @@
+Week 0 Pre-course material
+  Git codes: 
+      git add  =  put the file in the staging period (not commit, but tracked) 
+      git commit = add file to version control 
+      git commit -m "xxxx"  =  pass a message that contails "xxxx" (used to take notes) 
+      git log  =  find all the versions of files and notes for them 
+      git diff  =  report the change made comparing to the previous version ("+" means any adds and "-" means any remove)
+      git checkout -- filename  =  delete the change 
