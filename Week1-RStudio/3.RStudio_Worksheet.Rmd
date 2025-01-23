@@ -1,6 +1,6 @@
 ---
 title: '3\. Worksheet: Basic R'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Jocelyn Huang; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -49,9 +49,9 @@ In the R code chunk below, please provide the code to:
 3) set your working directory to your '3.RStudio' folder. 
 
 ```{r}
-
-
-
+rm(list=ls())
+getwd()
+#setwd( "/cloud/project/QB2025_Huang/Week1-RStudio")
 ```
 
 ## 3) USING R AS A CALCULATOR
@@ -65,9 +65,22 @@ Feel free to reference the **1. Introduction to version control and computing to
 4) the log (base e) of your favorite number.
 
 ```{r}
+l <- 5
+V_cube <- l^3
+print(V_cube)
 
+r <- 2
+A_circle <- pi * r^2
+print(A_circle)
 
+theta <- pi/4
+hypo <- sqrt(2)
+l_opst <- theta*hypo
+print(l_opst)
 
+fav_num <- 25
+fav_log <- log(fav_num)
+print(fav_log)
 
 ```
 
@@ -83,8 +96,9 @@ In the R-code chunk below, do the following:
 3) Add `x` and `w` and divide by 15.
 
 ```{r}
-
-
+x <- c(1,2,3,4,5)
+w <- x*14
+final <- (x + w)/15
 
 ```
 
@@ -94,8 +108,9 @@ Now, do the following:
 3) Use the combine function to create one more vector, `d` that consists of any three elements from `w` and any four elements of `k`.
 
 ```{r}
-
-
+k <- c(3,5,7,2)
+filler <- k*x
+d <- c(w[1:3], k[1:4])
 
 ```
 
@@ -106,17 +121,14 @@ In the R-code chunk below, calculate the **summary statistics** (i.e., maximum, 
 ```{r}
 v <- c(16.4, 16.0, 10.1, 16.8, 20.5, NA, 20.2, 13.1, 24.8, 20.2, 25.0, 20.5, 30.5, 31.4, 27.1)
 
-
-
-
-
-
-
-
-
-
-
-
+max <- max(v)
+min <- min(v)
+sum <- sum(v)
+mean <- mean(v)
+median <- median(v)
+var <- var(v)
+sd <- sd(v)
+sem <- sd/(sqrt(length(v)))
 
 ```
 
@@ -128,10 +140,9 @@ Both columns should consist of random numbers.
 Make the mean of the first column equal to 8 with a standard deviation of 2 and the mean of the second column equal to 25 with a standard deviation of 10.
 
 ```{r}
-
-
-
-
+n_r <- 5
+n_c <- 2
+mtx <- matrix(c(rnorm(n_r, mean = 8, sd = 2), rnorm(n_r, mean = 25, sd = 10)), nrow = n_r, ncol = n_c, byrow = FALSE)
 
 ```
 
@@ -139,7 +150,8 @@ Make the mean of the first column equal to 8 with a standard deviation of 2 and 
 What do the arguments in this function specify? 
 Remember to use `help()` or type `?rnorm`.
 
-> Answer 1:
+> Answer 1: 
+'rnorm' function randomly generate a normal distribution of n numbers with the mean and standard deviation specified by the user. The basic fomular for 'rnorm' is rnorm(n, mean = __, sd = __), in which n stands for how many numbers you want it to generates, mean and sd stands for mean and standard deviation of the distribution that you also need to put in. 
 
 
 In the R code chunk below, do the following: 
@@ -148,15 +160,17 @@ In the R code chunk below, do the following:
 3) Determine the dimensions of the transposed matrix.
 
 ```{r}
-
-
+m <- as.matrix(read.table("data/matrix.txt", sep = "", header = FALSE))
+n <- t(m)
+dim(n)
 
 ```
 
 
 ***Question 2***: What are the dimensions of the matrix you just transposed?
 
-> Answer 2:
+> Answer 2: 
+The matrix is 5x10 (5 rows, 10 columns). 
 
 
 ###Indexing a Matrix
@@ -166,7 +180,8 @@ In the R code chunk below, do the following:
 2) Remove the last row of matrix `m`.
 
 ```{r}
-
+m_mod <- m[, c(1:2,4:5)]
+m_mod2 <- m[1:9, ]
 
 ```
 
@@ -178,7 +193,8 @@ In the R code chunk below, do the following:
 2) Display the structure of this data set.
 
 ```{r}
-
+meso <- read.table("data/zoop_nuts.txt", sep = "", header = TRUE)
+str(meso)
 
 ```
 
@@ -190,7 +206,11 @@ In the R-code chunk below, do the following:
 3) Conduct a simple **Pearson's correlation** analysis.
 
 ```{r}
+meso.num <- meso[, 3:8]
+pairs(meso.num)
 
+cor1 <- cor(meso.num)
+print(cor1)
 
 ```
 
@@ -198,7 +218,7 @@ In the R-code chunk below, do the following:
 ***Question 3***: Describe some of the general features based on the visualization and correlation analysis above?
 
 > Answer 3:
-
+Algal biamass seems to have a weak negative correlation with all other variables (total phosphorus concentration, total nitrogen concentration, soluable reactive phosphorus concentration, total inorganic nutrient concentration, and zooplankton biomass). The total nitrogen concentration and the total inorganic nutrient concentration has the strongest correlation with the coefficient of 0.969. The zooplankton biomass is positively and somewhat strongly correlated the concentration of total phosphorus (0.6974), total nitrogen (0.7562), soluable reactive phosphorus (0.6762), and total inorganic nutrient (0.7605). 
 
 In the R code chunk below, do the following:
 1) Redo the correlation analysis using the `corr.test()` function in the `psych` package with the following options: method = "pearson", adjust = "BH".
@@ -206,8 +226,11 @@ In the R code chunk below, do the following:
 3) Use the print command from the handout to see the results of each correlation analysis.
 
 ```{r}
-
-
+require(psych)
+cor2 <- corr.test(meso.num, method = "pearson", adjust = "BH")
+print(cor2, digits = 3)
+cor3 <- corr.test(meso.num, method = "spearman", adjust = "BH")
+print(cor3, digits = 3)
 
 ```
 
@@ -219,6 +242,10 @@ With the Pearson's method, is there evidence for false discovery rate due to mul
 Why is false discovery rate important?
 
 > Answer 4: 
+While the cor() function in base R generate the correlation coefficient matrix for the pairwise comparsion of selected variables, corr.test() in psych package can generate another the P-value matrix, which represents the probability of each pairwise comparison of variables having zero coefficient in the population. "BH" stands for the Benjamini & Hochberg correction, which avoids false discovery rate. 
+Comparing between using parametric and non-parametric methods, the results of the p-value are not sensitive. Correlation between chlorophyll a concentration (algal biomass) and any of the other variables are not significantly different from zero using both parametric and non-parametric test, which means there is nearly no correlation between algal biomass and all other factors. However, p-value for coefficient in all other pairwise comparison are significant regardless of the test used. 
+Generally speaking, non-parametric tests are used when the data is ranked, or if the data is not normally distributed or have a relatively small sample size. 
+False discovery rate measures the false rejection of null hypothesis (the amount of false significance that are supposed to be not significant). False discovery rate will arise when we perform multiple tests at the same time (like in this example, each pairs are tested twice). The role of the false discovery rate is to control the chance of making Type I error and count less insignificant as significant. 
 
 ### Linear Regression
 
@@ -228,11 +255,18 @@ In the R code chunk below, do the following:
 3) Produce a plot of this regression analysis including the following: categorically labeled points, the predicted regression line with 95% confidence intervals, and the appropriate axis labels.
 
 ```{r}
-
-
-
-
-
+fitreg <- lm(ZP ~ TN, data = meso)
+summary(fitreg)
+plot(meso$TN, meso$ZP, ylim = c(0,10), xlim = c(500, 5000),
+     xlab = expression(paste("Total Nitrogen (", mu, "g/L)")), 
+     ylab = "Zooplankton Biomass (mg/L)", las = 1)
+text(x = meso$TN, y = meso$ZP, labels = meso$NUTS, pos = 3, cex = 0.8)
+newTN <- seq(min(meso$TN), max(meso$TN), 10)
+regline <- predict(fitreg, newdata = data.frame(TN = newTN))
+lines(newTN, regline)
+conf95 <- predict(fitreg, newdata = data.frame(TN = newTN),
+                  interval = c("confidence"), level = 0.95, type = "response")
+matlines(newTN, conf95[, c("lwr", "upr")], type = "l", lty = 2, lwd = 1, col = "black")
 
 
 ```
@@ -240,11 +274,8 @@ In the R code chunk below, do the following:
 ***Question 5***: Interpret the results from the regression model
 
 > Answer 5:
+The regression model above shows that the total nitrogen concentration (ug/L) has a significantly strong effect on the zooplankton biomass (mg/L), since the p-value is small enough (p = 1.91e-05). Higher total nitrogen concentration in the environment,  larger the zooplankton biomass is. The 95% confidence interval represents the region where, with 95% confidence, the actual regression between the total nitrogen concentration in the environment and the biomass of the zooplankton will fall between. Since the R-squared is 0.5719, the regression model is moderatel fit as the model captures 57.19% of the variance in zooplankton biomass.  
 
-
-```{r}
-
-```
 
 ### Analysis of Variance (ANOVA)
 
@@ -256,11 +287,27 @@ Using the R code chunk below, do the following:
 
 
 ```{r}
+NUTS <- factor(meso$NUTS, levels = c('L', 'M', 'H'))
+zp.means <- tapply(meso$ZP, NUTS, mean)
+sem <- function(x){
+  sd(na.omit(x))/sqrt(length(na.omit(x)))
+}
+zp.sem <- tapply(meso$ZP, NUTS, sem)
 
+#bar plot
+bp <- barplot(zp.means, ylim = c(0, round(max(meso$ZP))), digits = 0, pch = 15, 
+              cex = 1.25, las = 1, cex.lab = 1.4, cex.axis = 1.25, 
+              xlab = "nutrient supply", ylab = "zooplankton biomass (mg/L)", 
+              names.arg = c("low", "medium,", "high"))
+arrows(x0 = bp, y0 = zp.means, y1 = zp.means - zp.sem, angle = 90,
+       length = 0.1, lwd = 1)
+arrows(x0 = bp, y0 = zp.means, y1 = zp.means + zp.sem, angle = 90,
+       length = 0.1, lwd = 1)
 
-
-
-
+#ANOVA
+fitanova <- aov(ZP ~ NUTS, data = meso)
+summary(fitanova)
+TukeyHSD(fitanova)
 
 
 ```
@@ -292,10 +339,58 @@ The remaining columns of data refer to the biomass (µg/L) of different zooplank
 ***Question 6***: With the visualization and statistical tools that we learned about in the **3. RStudio** handout, use the site-by-species matrix to assess whether and how different zooplankton taxa were responsible for the total biomass (ZP) response to nutrient enrichment. 
 Describe what you learned below in the "Answer" section and include appropriate code in the R chunk.
 
+> Answer 6:
+I used a stacked bar plot and two-way ANOVA in order to assess whether different zooplankton taxa contribute differently to the total biomass reponse to nutrient. In another word, I compared the biomass of different zooplankton taxa under different nutrient treatment. I found that among the nine taxa, CHYD (*Chydorus* sp.) is the taxon that contribute the most to the total biomass of zooplankton in all three treatment groups, and SIMO (*Simocephallus* sp.) being the second biggest contributor in medium and high nutrient groups. The result of the ANOVA shows that threatment groups, taxon of the zooplankton, and the interaction  of taxon and zooplankton all have a significant effect on zooplankton biomass, showing that there is a difference between each taxon in biomass contribution. 
+
 ```{r}
+zoops <- read.table("data/zoops.txt", sep = "", header = TRUE)
+sbs <- zoops[, 3:11] #create site by species matrix
+print(sbs)
+
+zoops$total.biomass <- zoops$CAL + zoops$DIAP + zoops$CYCL + zoops$BOSM + 
+  zoops$SIMO + zoops$CERI + zoops$NAUP + zoops$DLUM + zoops$CHYD
 
 
+NUTS <- factor(zoops$NUTS, levels = c('L', 'M', 'H'))
+total.mean <- tapply(zoops$total.biomass, NUTS, mean)
+cal.mean <- tapply(zoops$CAL, NUTS, mean)
+diap.mean <- tapply(zoops$DIAP, NUTS, mean)
+cycl.mean <- tapply(zoops$CYCL, NUTS, mean)
+bosm.mean <- tapply(zoops$BOSM, NUTS, mean)
+simo.mean <- tapply(zoops$SIMO, NUTS, mean)
+ceri.mean <- tapply(zoops$CERI, NUTS, mean)
+naup.mean <- tapply(zoops$NAUP, NUTS, mean)
+dlum.mean <- tapply(zoops$DLUM, NUTS, mean)
+chyd.mean <- tapply(zoops$CHYD, NUTS, mean)
 
+#Create matrix for bar plot
+species_by_treatment <- rbind(cal.mean, diap.mean, cycl.mean, bosm.mean, 
+                                simo.mean, ceri.mean, naup.mean, dlum.mean,
+                                chyd.mean)
+colnames(species_by_treatment) <- c("Low", "Medium", "High")
+rownames(species_by_treatment) <- c("CAL", "DIAP", "CYCL", "BOSM", "SIMO",
+                                    "CERI", "NAUP", "DLUM", "CHYD")
+species_by_treatment <- as.matrix(species_by_treatment)
+
+#Stacked bar plot 
+library(RColorBrewer)
+color <- brewer.pal(9, "Paired")
+barplot(species_by_treatment, col = color , border = "white", space= 0.04, 
+        font.axis=2, ylim = c(0,round(max(total.mean))),
+        legend = rownames(species_by_treatment), 
+        args.legend = list(x = "topright", inset = c(-0.1, 0), bty = "n", cex = 0.5),
+        xlab = "categorical nutrient treatment",
+        ylab = "zooplankton biomass (mg/L)")
+
+#Create new data set for ANOVA
+stacked <- stack(zoops[, 3:11])
+anova_frame <- data.frame(NUTS = rep(zoops$NUTS, times = 9),
+                          taxon = stacked$ind,
+                          biomass = stacked$values)
+
+species_anova <- aov(biomass ~ NUTS * taxon, data = anova_frame)
+summary(species_anova)
+TukeyHSD(species_anova)
 
 ```
 
