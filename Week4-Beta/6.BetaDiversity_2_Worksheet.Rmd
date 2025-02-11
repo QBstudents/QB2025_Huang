@@ -1,6 +1,6 @@
 ---
 title: '6\. Worksheet: Among Site (Beta) Diversity -- Part 2'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Jocelyn Huang; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -42,9 +42,12 @@ In the R code chunk below, provide the code to:
 4. load the `vegan` R package (be sure to install if needed).  
 
 ```{r}
-
-
-
+remove(list = ls())
+getwd()
+setwd("/cloud/project/QB2025_Huang/Week4-Beta")
+library(vegan)
+library(ade4)
+library(indicspecies)
 
 ```
 
@@ -54,8 +57,8 @@ In the R code chunk below, load the `doubs` dataset from the `ade4` package
 
 ```{r}
 # note, pleae do not print the dataset when submitting
-
-
+data(doubs)
+fish <- doubs$fish[-8,]
 
 ```
 ## 3) HYPOTHESIS TESTING
@@ -69,14 +72,15 @@ In the code chunk below, test the hypothesis that fish community composition var
 2. use the multivariate analyses for categorical predictors to describe how fish community structure relates to habitat quality.
 
 ```{r}
-
-
-
-
-
-
-
-
+quality <- c(rep("HQ", 13), rep("MQ", 5), rep("LQ", 6), rep("MQ", 5)) #Create "Factors" vector
+adonis2(fish ~ quality, method = "bray", permutations = 999) #PERMANOVA
+indval <- multipatt(fish, cluster = quality, func = "IndVal.g",
+                    control = how(nperm = 999)) #Indicator Value
+summary(indval)
+fish.rel <- decostand(fish, method = "total")
+phi <- multipatt(fish.rel, cluster = quality, func = "r.g",
+                 control = how(nperm = 999))
+summary(phi)
 
 ```
 
@@ -84,7 +88,8 @@ In the code chunk below, test the hypothesis that fish community composition var
 Are the different analyses consistent with one another and do they agree with the visualizations (heat maps, cluster dendograms, ordinations) that you created?
 
 > ***Answer 1***: 
-
+> Since the p-value is significant (p=0.001) with 999 permutation, we can conclude from the PERMANOVA test that fish species composition indeed varies with river quality. According to the Indicator Value of each species in each river quality group, blageon is a strong indicator species of "moderate quality" river with indicator score of 0.686. Brown trout (IndVal = 0.86) and minnow (0.859) are considered strong indicator species of river habitat that has at least moderate quality (high and moderate quality). On the other hand, multiple species are considered strong indicators species of "low and moderate quality" rivers, which means their presences indicate that the river does not have very high quality. Results of phi coefficient analysis show that species that prefer high quality rivers include minnow, brown trout, and stone loach, species that prefer low quality are common roach and bleak; while those prefer moderate quality are many: eel, spirlin, toxostoma, and black bullhead. 
+> IndVal and phi coefficient analysis disagree with each other as IndVal results in blageon as a strong indicator species for moderate river quality, but phi coefficient results show that blageon is not strongly associated with moderate-quality river. However, phi coefficient is especially agreeing with the cluster dendogram made in the last worksheet.
 
 ### B.  Multivariate Procedures for Continuous Designs
 
@@ -95,10 +100,11 @@ In the R code chunk below, do the following:
 2. use a Mantel test to test the hypothesis that fish assemblages are correlated with stream environmental variables.
 
 ```{r}
-
-
-
-
+# Define matrices:
+fish.dist <- vegdist(doubs$fish[-8, ], method = "bray")
+env.dist <- vegdist(scale(doubs$env[-8, ]), method = "euclid")
+# Mantel test: 
+mantel(fish.dist, env.dist)
 
 ```
 
@@ -106,6 +112,7 @@ In the R code chunk below, do the following:
 How does this relate to your hypothesis about stream quality influencing fish communities?
 
 > ***Answer 2***:  
+> Result of the Mantel test suggests that fish diversity is significantly (p = 0.001) correlated with stream environmental conditions, and such correlation is moderately strong and positive (r = 0.604). Since the hypothesis states that fish community composition is more diverse in stream sections that have higher quality, Mantel test result proves this.  
 
 ### ii.  Constrained Ordination
 In the R code chunk below, do the following:  
@@ -117,24 +124,60 @@ In the R code chunk below, do the following:
 5. calculate the explained variation on the first and second constrained axes,
 6. plot the constrained ordination results including labeled points for each site, and
 7. add vectors that demonstrate the influence of each environmental factor the constrained ordination.   
+
 ```{r}
+env.chem <- as.matrix(doubs$env[-8, 5:11]) # Environmental matrix
+doubs.dbrda <- dbrda(fish.dist ~ ., as.data.frame(env.chem))
+ordiplot(doubs.dbrda) # test
+#psych::corr.test(env.chem)
 
+doubs.dbrda.modO <- dbrda(fish.dist ~ 1, as.data.frame(env.chem)) # Model only the intercept
+ordiplot (doubs.dbrda.modO) # This is PCoA
+doubs.dbrda.mod1 <- dbrda(fish.dist ~ ., as.data.frame (env.chem)) # Full model
+# Function returns the model with lowest AIC value
+doubs.dbrda <- ordiR2step(doubs.dbrda.modO, doubs.dbrda.mod1, perm.max = 200)
 
+# What is the model:
+doubs.dbrda$call
+doubs.dbrda$anova
+ordiplot(doubs.dbrda)
 
+# Permutation tests: 
+permutest(doubs.dbrda, permutations = 999) # significance
+envfit(doubs.dbrda, env.chem[, c(4,6,7)], perm = 999) # correlation
 
+# Calculate Explained variation
+dbrda.explainvar1 <- round(doubs.dbrda$CCA$eig[1] /
+                    sum(c(doubs.dbrda$CCA$eig, doubs.dbrda$CA$eig)), 3) * 100
+dbrda.explainvar2 <- round(doubs.dbrda$CCA$eig[2] /
+                    sum(c(doubs.dbrda$CCA$eig, doubs.dbrda$CA$eig)), 3) * 100
 
-
-
-
-
-
-
-
-
-
-
-
-
+# Define plot parameters
+par(mar = c(5,5,4,4) + 0.1)
+plot(scores(doubs.dbrda, display = "wa"), xlim = c(-1.3, 1.1),
+     ylim = c(-1.1, 2.7), xlab = paste("dbRDA 1 (", dbrda.explainvar1, "%)",
+     sep = ""), ylab = paste("dbRDA 2 (", dbrda.explainvar2, "%)", sep = ""),
+     pch = 16, cex = 2.0, type = "n", cex.lab = 1.5,
+     cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+points(scores(doubs.dbrda, display = "wa"), pch = 19, cex = 3, bg = "gray", 
+       col = "gray")
+text(scores(doubs.dbrda, display = "wa"), 
+     labels = row.names(scores(doubs.dbrda, display = "wa")))
+vectors <- scores(doubs.dbrda, display = "bp")
+arrows(0, 0, vectors[, 1], vectors [, 2],
+       lwd = 2, lty = 1, length = 0.2, col = "red")
+text(vectors[, 1], vectors[, 2], pos = 3, 
+     labels = row.names(vectors))
+axis(side = 3, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(vectors[, 1])) * 2, 
+     labels = pretty(range(vectors[, 1])))
+axis(side = 4, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(vectors[, 2])) * 2, 
+     labels = pretty(range(vectors[, 2])))
 
 
 ```
@@ -142,6 +185,8 @@ In the R code chunk below, do the following:
 ***Question 3***: Based on the constrained ordination, what are the environmental variables (or groups of correlated variables) that seem to be contributing to variation in fish community structure?
 
 > ***Answer 3***: 
+> The selected model with lowest AIC includes environmental variables oxygen level ("oxy"), "bdo", and nitrogen level ("nit"). Since the anova results show that these three parameters all have significant p-value of 0.002, all three environmental factors seem to contribute significantly to the overall fish community structure. According to the distance-based ordination plot, oxygen level seems to contribute a lot to sites 1, 14, 4, 10, 6, 15, and 16, while effect of bdo is more pronounced in site 9, and that of nitrogen level in sites 17, 5, 18, and 19. On the other hand, oxygen level (being the longest vector) has the strongest influence on the fish community composition among the selected three environmental conditions, and bdo has the weakest. While the sites that are strongly influenced by oxygen level are also points that are closer to each other on the ordination plot, this could also mean that the oxygen levels in these sites are very similar and which lead to similar composition. 
+
 
 ### iii. Variation Partitioning
 In the code chunk below,   
@@ -153,22 +198,125 @@ In the code chunk below,
 5. Partition the variation among sites into the relative importance of space, environment, spatially structured environment, and residuals,
 6. Plot the variation partitioning output to visualize it.  
 ```{r}
+doubs.dbrda$anova
+env.mod <- model.matrix(~ oxy + bdo + nit, as.data.frame(env.chem))[,-1]
+rs <- rowSums(fish)/sum(fish) # relative abundance of each site
+doubs.pcnmw <- pcnm(dist(doubs$xy[-8,]), w = rs, dist.ret = T)
+doubs.pcnmw$values > 0 # filter for the non-negatice eigenvalues as these are the only that are meaningful
 
+# Model selection that drops the redundant eigenvalues: 
+doubs.space <- as.data.frame(scores(doubs.pcnmw))
+doubs.pcnm.mod0 <- dbrda(fish.dist ~ 1, doubs.space)
+doubs.pcnm.mod1 <- dbrda(fish.dist ~ ., doubs.space)
+step.pcnm <- ordiR2step(doubs.pcnm.mod0, doubs.pcnm.mod1, perm.max = 200)
 
+plot(step.pcnm) # Visualize the biplot for spatial factors' influence on sites composition
+step.pcnm$anova
+space.mod <- model.matrix(~ PCNM2 + PCNM3 + PCNM5 + PCNM1 + 
+                            PCNM13 + PCNM16 + PCNM6, doubs.space)[,-1]
 
+# Use partial constrained ordination, which requires two explanatory matrix instead of one (2 layers of parameter data)
+doubs.total.env <- dbrda(fish.dist ~ env.mod)
+doubs.total.space <- dbrda(fish.dist ~ space.mod)
+doubs.env.cond.space <- dbrda(fish.dist ~ env.mod + Condition(space.mod))
+doubs.space.cond.env <- dbrda(fish.dist ~ space.mod + Condition(env.mod))
 
+permutest(doubs.env.cond.space, permutation = 999)
+permutest(doubs.space.cond.env, permutation = 999)
+permutest(doubs.total.env, permutation = 999)
+permutest(doubs.total.space, permutation = 999)
 
+doubs.varpart <- varpart(fish.dist, env.mod, space.mod)
+doubs.varpart
 
+par(mar = c(2,2,2,2))
+plot(doubs.varpart)
+text(1, 0.25, "Space")
+text(0, 0.25, "Env")
+mtext("Variation Partitioning of \nDoubs Fish Diversity", side = 3, line = -3)
 
 ```
 
 ***Question 4***: Interpret the variation partitioning results.   
 
 > ***Answer 4***: 
+> The variation partitioning plot shows that 13% of the total variation in the fish community composition among sites are explained by the environmental condition alone, while 24% of the variation can be explained by space alone. 37% of the variation in community structure is likely driven by spcially structured environmental variation (the shared effect of environment and space). 
 
 ## SYNTHESIS
 
 Load the dataset from that you and your partner are using for the team project. 
 Use one of the hypothesis-testing tools introduced in the beta diversity module. 
 Interpret the findings of your data with respect to principles of biodiversity. 
+
+```{r}
+### Load data: ----
+# Load species-by-site matrix:
+bac <- read.table("/cloud/project/QB2025_Huang/Group-project/bacteria_div.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE, row.names = 1)
+# drop till 1 site by location:
+bac <- bac[!grepl("_3|_2|_1", rownames(bac)), ] 
+# Load environmental data
+bac.env <- read.table("/cloud/project/QB2025_Huang/Group-project/bac_env.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE, row.names = 1)
+# Load spatial data
+bac.xy <- read.table("/cloud/project/QB2025_Huang/Group-project/bac_xy.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE, row.names = 1)
+
+# Make distance matrices: 
+# Bray-Curtis: 
+bac.bc <- vegdist(bac, method = "bray", upper = TRUE, diag = TRUE)
+
+### PERMANOVA: ----
+land_type <- bac.env$Landscape
+habitat <- bac.env$Habitat
+adonis2(bac ~ land_type, method = "bray", permutation = 999)
+adonis2(bac ~ habitat, method = "bray", permutation = 999)
+
+### Constrained Ordination ----
+bac.envcon <- as.matrix(bac.env[3:5]) #Continous env conditions
+bac.dbrda <- dbrda(bac.bc ~ ., as.data.frame(bac.envcon)) 
+
+bac.dbrda.modO <- dbrda(bac.bc ~ 1, as.data.frame(bac.envcon)) # Model only the intercept
+ordiplot (bac.dbrda.modO) # This is PCoA
+bac.dbrda.mod1 <- dbrda(bac.bc ~ ., as.data.frame (bac.envcon)) # Full model
+# Function returns the model with lowest AIC value
+bac.dbrda <- ordiR2step(bac.dbrda.modO, bac.dbrda.mod1, perm.max = 200)
+
+bac.dbrda$call
+bac.dbrda$anova
+
+bc.explainvar1 <-  round(bac.dbrda$CCA$eig[1] /
+                           sum(c(bac.dbrda$CCA$eig, bac.dbrda$CA$eig)), 3) * 100
+bc.explainvar2 <- round(bac.dbrda$CCA$eig[2] /
+                          sum(c(bac.dbrda$CCA$eig, bac.dbrda$CA$eig)), 3) * 100
+# Plot the ordination plot:
+par(mar = c(5,5,4,4) + 0.1)
+plot(scores(bac.dbrda, display = "wa"), xlim = c(-1.3, 1.1), ylim = c(-1.1, 2.7), 
+     xlab = paste("dbRDA 1 (", bc.explainvar1, "%)",sep = ""), 
+     ylab = paste("dbRDA 2 (", bc.explainvar2, "%)", sep = ""),
+     pch = 16, cex = 2.0, type = "n", cex.lab = 1.5,
+     cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+points(scores(bac.dbrda, display = "wa"), pch = 19, cex = 1, bg = "gray", 
+       col = "gray")
+text(scores(bac.dbrda, display = "wa"), 
+     labels = substr(row.names(scores(bac.dbrda, display = "wa")), 1, 4))
+bc.vectors <- scores(bac.dbrda, display = "bp")
+arrows(0, 0, bc.vectors[, 1], bc.vectors[, 2],
+       lwd = 2, lty = 1, length = 0.2, col = "blue")
+text(bc.vectors[, 1], bc.vectors[, 2], pos = 3, 
+     labels = row.names(bc.vectors), col = "blue")
+axis(side = 3, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(bc.vectors[, 1])) * 2, 
+     labels = pretty(range(bc.vectors[, 1])))
+axis(side = 4, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(bc.vectors[, 2])) * 2, 
+     labels = pretty(range(bc.vectors[, 2])))
+
+```
+
+> Answer:
+> We performed constrained ordination analysis on the effect of three environmental variables (average local temperature, mean annual precipitation, mean annual temperature) on the bacterial community structure. The ANOVA results for the distanced-based redundancy analysis show that all three environmental variables contribute significantly to the bacterial community structure. Since the vector of Mean annual precipitation (MAP) is the longest, this means that the influence of precipitation to the community composition of bacteria is the strongest among the three environmental factors. Mean annual precipitation vector draws across sites 5933, 6231, and 6122, which means the composition of these three sites are strongly associated with the amount of mean precipitation of the sites. 
+> We also performed a permutation ANOVA (PERMANOVA) for the categorical data (habitat type and land use) of the sites, and found that neither is significantly influencing the bacterial community composition. However, with a p-value of 0.106, land use type (whether the sites is used for agriculture, urban, or near-natural) has a tendency of influencing the bacteria diversity. 
+
 
