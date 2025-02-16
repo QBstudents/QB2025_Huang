@@ -1,6 +1,6 @@
 ---
 title: '7\. Worksheet: Diversity Synthesis'
-author: "Student Name; Z620: Quantitative Biodiversity, Indiana University"
+author: "Jocelyn Huang; Z620: Quantitative Biodiversity, Indiana University"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 geometry: margin=2.54cm
@@ -65,7 +65,14 @@ In the R code chunk below, please provide the code to:
 4) Load the `vegan` R package (be sure to install first if you have not already).
 
 ```{r}
-
+rm(list = ls())
+getwd()
+setwd("/cloud/project/QB2025_Huang/Week5-Confection")
+library(vegan)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(broom)
 
 ```
 
@@ -75,13 +82,23 @@ In the R code chunk below, please provide the code to:
 Based on these results, discuss how individual vs. collective sampling efforts capture the diversity of the source community.
 
 ```{r}
+#source <- read.csv(file = "./data/jelly.source.comm.csv", header = TRUE, row.names = 1)
+#source.t <- as.data.frame(t(source)) 
+#specnumber(source.t)
 
+# load SbyS matrix: 
+jelly <- read.csv(file = "./data/Jelly belly data! - SbyS.csv", header = TRUE, row.names = 1)
+jelly.S <- specnumber(jelly)
+min.N <- min(rowSums(jelly))
+S.rarefy <- rarefy(x = jelly, sample = min.N, se = TRUE)
+rarecurve(x = jelly, step = 200, col = "blue", cex = 0.6, las = 1)
+abline(0, 1, col = 'red')
+text(25, 25, "1:1", pos = 2, col = 'red')
 
 ```
 
 > ***Answer 1***:
->
-
+> Everyone has slightly different sample size and differnt total number of observed species in each samples. Collective sampling can reduce the individual error in sampling and identifying species, and can increase the total number of sample sizes. However, with individual sampling, the identification scheme is probably going to be more consistent. From the rarefaction plot, we can also tell that the differences in observed richness among each sample are not entirely because of the differences in the size of each sample, but might be influenced by other factors instead. 
 
 **Question 2:** Starting with the site-by-species matrix, visualize beta diversity.
 In the code chunk below, conduct principal coordinates analyses (PCoA) using both an abundance- and incidence-based resemblance matrix.
@@ -90,23 +107,100 @@ Which "species" are contributing the patterns in the ordinations?
 How does the choice of resemblance matrix affect your interpretation?
 
 ```{r}
+# Creating a distance-based resemblance matrix 
+jelly.dj <- vegdist(jelly, method = "jaccard", binary = TRUE) #jaccard
+jelly.db <- vegdist(jelly, method = "bray") #bray-curtis
+
+# Load the function for identifying influential species
+source("/cloud/project/QB2025_Huang/Week3-Beta/bin/spec.scores.function.R")
+jellyREL <- jelly
+  for(i in 1:nrow(jelly)){
+    jellyREL[i, ] = jelly[i, ]/sum(jelly[i, ])
+  }
+
+# Abundance-based PCoA ---- 
+jelly.db.pcoa <- cmdscale(jelly.db, eig = TRUE, k = 3)
+db.explainvar1 <- round(jelly.db.pcoa$eig[1]/sum(jelly.db.pcoa$eig), 3)*100
+db.explainvar2 <- round(jelly.db.pcoa$eig[2]/sum(jelly.db.pcoa$eig), 3)*100
+db.explainvar3 <- round(jelly.db.pcoa$eig[3]/sum(jelly.db.pcoa$eig), 3)*100
+db.sum.eig <- sum(db.explainvar1, db.explainvar2, db.explainvar3)
+jelly.db.pcoa <- add.spec.scores.class(jelly.db.pcoa, jellyREL, method = "pcoa.scores") # calculate the species scores
+
+# Plot the Abundance-based PCoA plot
+par(mar = c(5,5,2,2) +0.3)
+plot(jelly.db.pcoa$points[, 1], jelly.db.pcoa$points[, 2], xlim = range(jelly.db.pcoa$points[, 1], jelly.db.pcoa$cproj[, 1], na.rm = TRUE), ylim = range(jelly.db.pcoa$points[, 2], jelly.db.pcoa$cproj[, 2], na.rm = TRUE),
+     xlab = paste("PCoA 1 (", db.explainvar1, "%)", sep = ""),
+     ylab = paste("PCoA 2 (", db.explainvar2, "%)", sep = ""),
+     pch = 16, cex = 2.0, type = "n", cex.lab = 1.5, 
+     cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+points(jelly.db.pcoa$points[, 1], jelly.db.pcoa$points[, 2],
+       pch = 19, cex = 1, bg = "gray", col = "gray")
+text(jelly.db.pcoa$points[, 1], jelly.db.pcoa$points[, 2],
+     labels = row.names(jelly.db.pcoa$points))
+text(jelly.db.pcoa$cproj[, 1], jelly.db.pcoa$cproj[, 2],
+     labels = row.names(jelly.db.pcoa$cproj), col = "brown")   #add species scores
+
+# Incidence-based PCoA ---- 
+jelly.dj.pcoa <- cmdscale(jelly.dj, eig = TRUE, k = 3)
+dj.explainvar1 <- round(jelly.dj.pcoa$eig[1]/sum(jelly.dj.pcoa$eig), 3)*100
+dj.explainvar2 <- round(jelly.dj.pcoa$eig[2]/sum(jelly.dj.pcoa$eig), 3)*100
+dj.explainvar3 <- round(jelly.dj.pcoa$eig[3]/sum(jelly.dj.pcoa$eig), 3)*100
+dj.sum.eig <- sum(dj.explainvar1, dj.explainvar2, dj.explainvar3)
+jelly.dj.pcoa <- add.spec.scores.class(jelly.dj.pcoa, jellyREL, method = "pcoa.scores") # calculate the species scores
+
+# Plot the Abundance-based PCoA plot
+par(mar = c(5,5,2,2) +0.3)
+plot(jelly.dj.pcoa$points[, 1], jelly.dj.pcoa$points[, 2], 
+     xlim = range(jelly.dj.pcoa$points[, 1], jelly.dj.pcoa$cproj[, 1], na.rm = TRUE), 
+     ylim = range(jelly.dj.pcoa$points[, 2], jelly.dj.pcoa$cproj[, 2], na.rm = TRUE),
+     xlab = paste("PCoA 1 (", dj.explainvar1, "%)", sep = ""),
+     ylab = paste("PCoA 2 (", dj.explainvar2, "%)", sep = ""),
+     pch = 16, cex = 2.0, type = "n", cex.lab = 1.5, 
+     cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+points(jelly.dj.pcoa$points[, 1], jelly.dj.pcoa$points[, 2],
+       pch = 19, cex = 1, bg = "gray", col = "gray")
+text(jelly.dj.pcoa$points[, 1], jelly.dj.pcoa$points[, 2],
+     labels = row.names(jelly.dj.pcoa$points))
+text(jelly.dj.pcoa$cproj[, 1], jelly.dj.pcoa$cproj[, 2],
+     labels = row.names(jelly.dj.pcoa$cproj), col = "brown")   #add species scores
 
 
 ```
 
 > ***Answer 2***:
->
+> Comparing to the incidence-based resemblence PCoA, abundance-based one seemed to have more samples that share similarities in community composition (e.g. Elaine, Bryan, and Jaeyoung's samples seem to be similar to each other's, and Aishwarya, Madison, and Anna's seem to be clustered together in terms of similarity). Incidence-based PCoA shows that the community species composition of the jelly beans are more spread out and diverse among the samples, except for Ashish and Madison's samples which seem to be similar. This may suggest that most samples have many rare species, and the species composition is also different among samples. We could also infer that the source community may be composed of a lot of rare species, which means the distribution may be skewed to the right. 
 
 
 **Question 3** Using the preference-profile matrix, determine the most popular jelly bean in the class using a control structure (e.g., for loop, if statement, function, etc).
 
 ```{r}
+jelly.pref <- read.csv(file = "./data/Jelly belly data! - Preference.csv", header = TRUE, row.names = 1)
+jelly.pref[is.na(jelly.pref)] <- 0
 
+max.sum <- 0
+max.name <- ""
+for(i in 1:ncol(jelly.pref)){
+  col.sum <- sum(jelly.pref[,i])
+  if(col.sum > max.sum){
+    max.sum <- col.sum
+    max.name <- colnames(jelly.pref)[i]
+  }
+}
+print(max.name)
+print(max.sum)
 
 ```
 
 > ***Answer 3***:
->
+> The most popular jelly bean is Berry Blue, which recieved 7 preference among samples. 
 
 
 **Question 4**
@@ -118,13 +212,17 @@ Make some observations about the preference-profiles of the class.
 
 
 ```{r}
+pref.dj <- vegdist(jelly.pref, method = "jaccard", binary = TRUE, upper = TRUE, diag = TRUE)
+pref.ward <- hclust(pref.dj, method = "ward.D2")
+print(pref.dj)
 
+par(mar = c(1,5,2,2) +0.1)
+plot(pref.ward, main = "Class Jelly bean Preference profile: Ward's Clustering", ylab = "Squared Jaccard Distance")
 
 ```
 
 > ***Answer 4***:
->
-
+> From the dissimilarity matrix generated from jaccard index, my "jelly buddy" is Elaine, who I shared the least pairwise dissimilarity (0.769) with. However, the cluster dendogram shows that my preference profile is clustered with Emma's because of similarity. The class is seperated into half based on their clustered similarities: Madison, Jaeyoung, El, Elaine and Bryan are grouped into one larger cluster, and the rest of the class into another. 
 
 
 
