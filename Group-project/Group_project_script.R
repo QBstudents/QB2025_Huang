@@ -9,12 +9,11 @@ rm(longdataBac_datadryad)
 load("Bac_wide_plot_final2_datadryad.rda")
 Bac_env <- Bac_wide_plot #rename
 rm(Bac_wide_plot)
-bac <- read.table("/cloud/project/QB2025_Huang/Group-project/bacteria_div.txt", 
+bac <- read.table("/cloud/project/QB2025_Huang/Group-project/Cleaned_data/bacteria_div.txt", 
                        header = TRUE, sep = "\t", stringsAsFactors = FALSE, row.names = 1)
 
 ## Data cleaning ----
 #Matrix based on diff habitat type 
-#bac_by_site <- with(Bacteria, tapply(Counts, list(PlotID, Sender), sum, default = 0)) 
 #write.table(bac_by_site, file = "bacteria_div.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
 
 #drop some rows 

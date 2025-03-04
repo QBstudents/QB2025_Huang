@@ -1,0 +1,186 @@
+---
+title: 'Group.Bac_Diversity'
+author: "Jocelyn Huang & Aishwarya Vaidya; Z620: Quantitative Biodiversity, Indiana University"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+geometry: margin=2.54cm
+---
+
+## Overview
+
+Here we can write the basic introduction to the data set we are using, the 
+citation to the data source, citation to the published article, and what the 
+variables are in the data sets. We can also specify the research question we are
+curious about in this section. 
+
+
+## Set up/Data clean-ups: 
+
+In the following chunk, we set up the document and load all required packages: 
+
+```{r}
+rm(list = ls())
+getwd()
+setwd("/cloud/project/QB2025_Huang/Group-project")
+
+library(vegan)
+library(ade4)
+library(viridis)
+library(gplots)
+library(indicspecies)
+
+```
+
+We begin by first loading all required data: 
+
+```{r}
+# Load long data set to build site by species matrix: 
+load("./raw_data/longdataBac_objects2_datadryad.rda")
+Bacteria <- longdataBac_datadryad #rename
+rm(longdataBac_datadryad)
+
+## Make SbyS matrix based on Plot ID: 
+### Note that each Plot ID has a corresponding habitat type
+### and each Quarant ID (Plot ID without letter) has a landscape type
+SbyS <- with(Bacteria, tapply(Counts, list(PlotID, Sender), sum, default = 0))
+
+## Store SbyS matrix into a .txt file in Cleaned_data 
+####write.table(SbyS, file = "bac_SbyS.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
+### If loading SbyS again: 
+####SbyS<- read.table("/cloud/project/QB2025_Huang/Group-project/Cleaned_data/bac_SbyS.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE, row.names = 1)
+
+
+# Load wide data set to build environmental matrix: 
+load("./raw_data/Bac_wide_plot_final2_datadryad.rda")
+env <- Bac_wide_plot #rename
+rm(Bac_wide_plot)
+## Drop unnecessary variables in env matrix: 
+rownames(env) <- env$PlotID
+env <- env[, -c(1, 2, 3, 9)]
+## Similarly, store the env matrix 
+###write.table(env, file = "bac_env.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
+
+# Use Bacteria data frame to find spatial data (xy): 
+xy <- aggregate(cbind(POINT_X, POINT_Y) ~ PlotID, data = Bacteria, FUN = mean)
+## Store xy matrix
+###write.table(xy, file = "bac_xy.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
+
+```
+
+Next, we find the remsemblence matrix based on the cleaned up Site-by-Species matrix. 
+Here, we try using Bary-Curtis Dissimilarity since we are working on abundance data. 
+
+```{r}
+bac.bc <- vegdist(SbyS, method = "bray", upper = TRUE, diag = TRUE)
+
+# Heatmap: 
+order <- rev(attr(bac.bc, "Labels"))
+levelplot(as.matrix(bac.bc)[, order], aspect = "iso", col.regions = mako, 
+          xlab = "Bacteria Site", ylab = "Bacteria Site", scales = list(cex = 0.5),
+          main = "Bray-Curtis Distance")
+
+# Cluster: 
+bac.ward <- hclust(bac.bc, method = "ward.D2")
+par(mar = c(1, 5, 2, 2) + 0.1)
+plot(bac.ward, main = "Bacteria: Ward's Clustering", 
+     ylab = "Squared Bray-Curtis Distance")
+
+```
+
+For our complete dataset, the visualization seems to be too blury to be informative.
+Therefore, to get a better visual, we decided to subset the dataset: 
+
+```{r}
+# Drop all but "_4" sites to have a better idea: 
+bac.reduced <- SbyS[!grepl("_3|_2|_1", rownames(SbyS)), ]
+env.reduced <- env[!grepl("_3|_2|_1", rownames(env)), ]
+
+# Reduced resemblance matrix: 
+bac.rd.bc <- vegdist(bac.reduced, method = "bray", upper = TRUE, diag = TRUE)
+
+# Heat Map: 
+order.rd <- rev(attr(bac.rd.bc, "Labels"))
+levelplot(as.matrix(bac.rd.bc)[, order.rd], aspect = "iso", 
+          col.regions = mako, 
+          xlab = "Bacteria Site", ylab = "Bacteria Site", 
+          scales = list(cex = 0.5),
+          main = "Bray-Curtis Distance")
+
+# Cluster: 
+bac.ward.rd <- hclust(bac.rd.bc, method = "ward.D2")
+par(mar = c(1, 5, 2, 2) + 0.1)
+plot(bac.ward.rd, main = "Bacteria: Ward's Clustering", 
+     ylab = "Squared Bray-Curtis Distance")
+
+# PCoA: 
+##using reduced SbyS/resemblance matrix
+bac.pcoa.rd <- cmdscale(bac.rd.bc, eig = TRUE, k = 3) 
+
+##Variation explained by the first three axes: 
+explainvar1_b <- round(bac.pcoa.rd$eig[1]/sum(bac.pcoa.rd$eig), 3)*100
+explainvar2_b <- round(bac.pcoa.rd$eig[2]/sum(bac.pcoa.rd$eig), 3)*100
+explainvar3_b <- round(bac.pcoa.rd$eig[3]/sum(bac.pcoa.rd$eig), 3)*100
+sum.eig <- sum(explainvar1_b, explainvar2_b, explainvar3_b)
+
+##Begin graphing the PCoA: 
+###Define each point with different color representing different habitat
+habitat_colors <- c("_A" = "yellow", "_F" = "green", "_G" = "blue", "_U" = "brown")
+names(habitat_colors) <- c("Arable", "Forest", "grassland", "settlement")
+point_name <- gsub("_(A|U|G|F)$", "", rownames(bac.pcoa.rd$points)) #display name
+point_colors <- sapply(row.names(bac.pcoa.rd$points), function(name) {
+  match <- grep("_A|_F|_G|_U", name, value = TRUE)
+  if (length(match) > 0) {
+    return(habitat_colors[substr(match, nchar(match) - 1, nchar(match))])  
+  }
+  else {
+    return("black")  # Default color for other rows
+  }
+})
+
+###Define each point symbol with landscape type in env subset 
+ldsp <- env.reduced[rownames(bac.pcoa.rd$points), "Landscape"]
+pch_val <- c(16,17,18)
+pch_map <- pch_val[as.numeric(factor(ldsp))]
+
+## Plot the PCoA: 
+par(mar = c(5, 5, 1, 2) + 0.1)
+plot(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], 
+     xlim = range(bac.pcoa.rd$points[, 1]),  
+     ylim = range(bac.pcoa.rd$points[, 2]),  
+     xlab = paste("PCoA 1 (", 34.5, "%)", sep = ""),
+     ylab = paste("PCoA 2 (", 13.1, "%)", sep = ""),
+     pch = pch_map, cex = 2.0, col = point_colors,
+     type = "n", cex.lab = 1.5, cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = TRUE, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = TRUE, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)  
+points(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], 
+       pch = pch_map, cex = 2, bg = "gray", col = point_colors)
+text(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], labels = point_name)
+legend("bottomleft", legend = names(habitat_colors), 
+       col = habitat_colors, 
+       pch = 16, 
+       cex = 0.5, # Smaller text 
+       pt.cex = 0.5, 
+       bty = "n")
+legend(x = -0.3, y = -0.25, legend = levels(factor(ldsp)), 
+       pch = pch_val, 
+       col = "black",
+       cex = 0.5,
+       pt.cex = 0.5,
+       bty = "n")
+
+```
+
+
+In the above graph, color represets habitat tyepe, and shapre represents landscape 
+type. From that, we hypothesize that bacterial diversity is affected by landscape 
+type, but likely not so much by habitat type. 
+
+We then performed hypothesis testing on that. 
+
+```{r}
+
+```
+
+
