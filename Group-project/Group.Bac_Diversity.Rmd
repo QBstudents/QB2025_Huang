@@ -57,11 +57,19 @@ rm(Bac_wide_plot)
 ## Drop unnecessary variables in env matrix: 
 rownames(env) <- env$PlotID
 env <- env[, -c(1, 2, 3, 9)]
+## Drop NA in env: 
+env <- na.omit(env) 
+
+## Match SbyS with it: 
+SbyS <- SbyS[rownames(env),]
+
 ## Similarly, store the env matrix 
 ###write.table(env, file = "bac_env.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
 
 # Use Bacteria data frame to find spatial data (xy): 
 xy <- aggregate(cbind(POINT_X, POINT_Y) ~ PlotID, data = Bacteria, FUN = mean)
+## Match xy to env: 
+xy <- xy[rownames(env),]
 ## Store xy matrix
 ###write.table(xy, file = "bac_xy.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE)
 
@@ -69,6 +77,8 @@ xy <- aggregate(cbind(POINT_X, POINT_Y) ~ PlotID, data = Bacteria, FUN = mean)
 
 Next, we find the remsemblence matrix based on the cleaned up Site-by-Species matrix. 
 Here, we try using Bary-Curtis Dissimilarity since we are working on abundance data. 
+
+## Visualization
 
 ```{r}
 bac.bc <- vegdist(SbyS, method = "bray", upper = TRUE, diag = TRUE)
@@ -125,7 +135,6 @@ sum.eig <- sum(explainvar1_b, explainvar2_b, explainvar3_b)
 ##Begin graphing the PCoA: 
 ###Define each point with different color representing different habitat
 habitat_colors <- c("_A" = "yellow", "_F" = "green", "_G" = "blue", "_U" = "brown")
-names(habitat_colors) <- c("Arable", "Forest", "grassland", "settlement")
 point_name <- gsub("_(A|U|G|F)$", "", rownames(bac.pcoa.rd$points)) #display name
 point_colors <- sapply(row.names(bac.pcoa.rd$points), function(name) {
   match <- grep("_A|_F|_G|_U", name, value = TRUE)
@@ -157,6 +166,7 @@ abline(h = 0, v = 0, lty = 3)
 points(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], 
        pch = pch_map, cex = 2, bg = "gray", col = point_colors)
 text(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], labels = point_name)
+names(habitat_colors) <- c("Arable", "Forest", "Grassland", "Settlement")
 legend("bottomleft", legend = names(habitat_colors), 
        col = habitat_colors, 
        pch = 16, 
@@ -177,9 +187,92 @@ In the above graph, color represets habitat tyepe, and shapre represents landsca
 type. From that, we hypothesize that bacterial diversity is affected by landscape 
 type, but likely not so much by habitat type. 
 
+## Hypothesis testing:
+### PERMANOVA:
 We then performed hypothesis testing on that. 
 
 ```{r}
+# PERMANOVA: 
+land_type <- env$Landscape
+habitat <- env$Habitat
+adonis2(SbyS ~ land_type, method = "bray", permutation = 999)
+adonis2(SbyS ~ habitat, method = "bray", permutation = 999)
+
+```
+
+Neither of them are significant. (p all larger than 0.2).
+
+###Mantel test:
+
+```{r}
+# Mantel test:
+env.ds <- vegdist(scale(env[3:5]), method = "euclid", na.rm = T)
+mantel(bac.bc, env.ds)
+
+```
+
+Correlation is only 0.05, which is very weak. 
+
+### Constriant ordination:
+Let's take a look at the dbRDA: 
+
+```{r}
+# Constraint Ordination: 
+## Take all variables (not just the continous ones)
+## To make dbrda able to handle categorical variable, convert the cat variable to dummy variables:
+landscape_dummy <- model.matrix(~ land_type - 1, data = env)
+habitat_dummy <- model.matrix(~ habitat - 1, data = env)
+
+## Now that landscape and habitat are converted into binary (0 and 1), cbind them back into env: 
+env_final <- cbind(env[, 3:5], landscape_dummy, habitat_dummy)
+
+## Perform dbRDA:
+bac.dbrda <- dbrda(bac.bc ~ ., as.data.frame(env_final)) # using abundance based distance
+ordiplot(bac.dbrda) 
+
+## Model selection:
+bac.dbrda.modO <- dbrda(bac.bc ~ 1, as.data.frame(env_final)) # Model only the intercept
+ordiplot (bac.dbrda.modO) # This is PCoA
+bac.dbrda.mod1 <- dbrda(bac.bc ~ ., as.data.frame (env_final)) # Full model
+bac.dbrda <- ordiR2step(bac.dbrda.modO, bac.dbrda.mod1, perm.max = 200) #select lowest AIC
+
+bac.dbrda$call$formula #model fomular
+permutest(bac.dbrda, permutations = 999) # model significance
+
+explainvar1 <-  round(bac.dbrda$CCA$eig[1] /
+                           sum(c(bac.dbrda$CCA$eig, bac.dbrda$CA$eig)), 3) * 100
+explainvar2 <- round(bac.dbrda$CCA$eig[2] /
+                          sum(c(bac.dbrda$CCA$eig, bac.dbrda$CA$eig)), 3) * 100
+
+# Plot the ordination plot:
+par(mar = c(5,5,4,4) + 0.1)
+plot(bac.dbrda$CA$u, 
+     xlim = c(-0.3, 0.3), 
+     ylim = c(-0.3, 0.2), 
+     xlab = paste("dbRDA 1 (", explainvar1, "%)",sep = ""), 
+     ylab = paste("dbRDA 2 (", explainvar2, "%)", sep = ""),
+     pch = 16, cex = 2.0, type = "n", cex.lab = 1.5,
+     cex.axis = 1.2, axes = FALSE)
+axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
+abline(h = 0, v = 0, lty = 3)
+box(lwd = 2)
+points(bac.dbrda$CA$u, pch = 19, cex = 1, bg = "gray", 
+       col = "gray")
+text(bac.dbrda$CA$u, 
+     labels = substr(row.names(bac.dbrda$CA$u), 1, 4))
+bc.vectors <- coef(bac.dbrda)
+arrows(0, 0, bc.vectors[, 1], bc.vectors[, 2],
+       lwd = 2, lty = 1, length = 0.2, col = "blue")
+text(bc.vectors[, 1], bc.vectors[, 2], pos = 3, 
+     labels = row.names(bc.vectors), col = "blue")
+axis(side = 3, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(bc.vectors[, 1])) * 2, 
+     labels = pretty(range(bc.vectors[, 1])))
+axis(side = 4, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
+     lwd = 2.2, at = pretty(range(bc.vectors[, 2])) * 2, 
+     labels = pretty(range(bc.vectors[, 2])))
+
 
 ```
 
