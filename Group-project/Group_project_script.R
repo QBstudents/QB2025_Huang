@@ -107,8 +107,9 @@ mantel(bac.bc, env.bc)
 
 ### Constrained Ordination ----
 env <- as.matrix(env.reduced[3:5]) #Continous env conditions
+
 bac.dbrda <- dbrda(bac.reduced ~ ., as.data.frame(env)) # using abundance based distance
-bac.dbrda_j <- dbrda(bac.jac ~ ., as.data.frame(env)) # using incidence based distance
+#bac.dbrda_j <- dbrda(bac.jac ~ ., as.data.frame(env)) # using incidence based distance
 ordiplot(bac.dbrda)
 #ordiplot(bac.dbrda_j) #This does not have ANOVA result
 bc.explainvar1 <-  round(bac.dbrda$CCA$eig[1] /
