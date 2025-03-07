@@ -28,6 +28,7 @@ library(ade4)
 library(viridis)
 library(gplots)
 library(indicspecies)
+library(ggplot2)
 
 ```
 
@@ -75,8 +76,62 @@ xy <- xy[rownames(env),]
 
 ```
 
+
+### Richness and env: 
+
+Calculate the species observed richness for each sites after rarefaction.
+
+```{r}
+min.N <- min(rowSums(SbyS))
+rarefy <- rarefy(x = SbyS, sample = min.N, se = TRUE)
+bac.richness <- t(rarefy)
+#bac.richness$S is the species richness
+
+env.analyze <- cbind(bac.richness, env)
+
+mod <- lm(S ~ MAP + MAT + Habitat + Landscape + average_Temp_DL, data = env.analyze)
+summary(mod)
+
+ggplot(env.analyze, aes(x = MAT, y = S)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Mean annual Temp on Bacteria Richness", x = "MAT (°C)", y = "Species Richness")
+
+ggplot(env.analyze, aes(x = MAP, y = S)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Mean annual Precipitation on Bacteria Richness", x = "MAP (mm)", y = "Species Richness")
+
+ggplot(env.analyze, aes(x = average_Temp_DL, y = S)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "purple") +
+  labs(title = "Mean local Temp on Bacteria Richness", x = "Average local temperature", y = "Species Richness")
+
+
+```
+
+
+Richness for habitat and landscape: 
+
+```{r}
+ggplot(env.analyze, aes(x = MAT, y = S, color = Landscape, shape = Habitat)) +
+  geom_point(size = 3) +
+  labs(title = "Species Richness vs. MAT", x = "MAT (°C)", y = "Species Richness") +
+  theme_minimal()
+
+ggplot(env.analyze, aes(x = MAP, y = S, color = Landscape, shape = Habitat)) +
+  geom_point(size = 3) +
+  labs(title = "Species Richness vs. MAP", x = "MAP (mm)", y = "Species Richness") +
+  theme_minimal()
+
+
+```
+
+
 Next, we find the remsemblence matrix based on the cleaned up Site-by-Species matrix. 
 Here, we try using Bary-Curtis Dissimilarity since we are working on abundance data. 
+
+
 
 ## Visualization
 
@@ -122,21 +177,26 @@ par(mar = c(1, 5, 2, 2) + 0.1)
 plot(bac.ward.rd, main = "Bacteria: Ward's Clustering", 
      ylab = "Squared Bray-Curtis Distance")
 
+```
+
+Next, we performed a PCoA Analysis on the original dataset:
+
+```{r}
 # PCoA: 
-##using reduced SbyS/resemblance matrix
-bac.pcoa.rd <- cmdscale(bac.rd.bc, eig = TRUE, k = 3) 
+##using original SbyS/resemblance matrix
+bac.pcoa <- cmdscale(bac.bc, eig = TRUE, k = 3) 
 
 ##Variation explained by the first three axes: 
-explainvar1_b <- round(bac.pcoa.rd$eig[1]/sum(bac.pcoa.rd$eig), 3)*100
-explainvar2_b <- round(bac.pcoa.rd$eig[2]/sum(bac.pcoa.rd$eig), 3)*100
-explainvar3_b <- round(bac.pcoa.rd$eig[3]/sum(bac.pcoa.rd$eig), 3)*100
-sum.eig <- sum(explainvar1_b, explainvar2_b, explainvar3_b)
+bac.explainvar1 <- round(bac.pcoa$eig[1]/sum(bac.pcoa$eig), 3)*100
+bac.explainvar2 <- round(bac.pcoa$eig[2]/sum(bac.pcoa$eig), 3)*100
+bac.explainvar3 <- round(bac.pcoa$eig[3]/sum(bac.pcoa$eig), 3)*100
+sum.eig <- sum(bac.explainvar1, bac.explainvar2, bac.explainvar3)
 
 ##Begin graphing the PCoA: 
 ###Define each point with different color representing different habitat
-habitat_colors <- c("_A" = "yellow", "_F" = "green", "_G" = "blue", "_U" = "brown")
-point_name <- gsub("_(A|U|G|F)$", "", rownames(bac.pcoa.rd$points)) #display name
-point_colors <- sapply(row.names(bac.pcoa.rd$points), function(name) {
+habitat_colors <- c("_A" = "orange", "_F" = "darkgreen", "_G" = "blue", "_U" = "brown")
+point_name <- gsub("_(A|U|G|F)$", "", rownames(bac.pcoa$points)) #display name
+point_colors <- sapply(row.names(bac.pcoa$points), function(name) {
   match <- grep("_A|_F|_G|_U", name, value = TRUE)
   if (length(match) > 0) {
     return(habitat_colors[substr(match, nchar(match) - 1, nchar(match))])  
@@ -147,45 +207,42 @@ point_colors <- sapply(row.names(bac.pcoa.rd$points), function(name) {
 })
 
 ###Define each point symbol with landscape type in env subset 
-ldsp <- env.reduced[rownames(bac.pcoa.rd$points), "Landscape"]
+ldsp <- env[rownames(bac.pcoa$points), "Landscape"]
 pch_val <- c(16,17,18)
 pch_map <- pch_val[as.numeric(factor(ldsp))]
 
 ## Plot the PCoA: 
 par(mar = c(5, 5, 1, 2) + 0.1)
-plot(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], 
-     xlim = range(bac.pcoa.rd$points[, 1]),  
-     ylim = range(bac.pcoa.rd$points[, 2]),  
+plot(bac.pcoa$points[, 1], bac.pcoa$points[, 2], 
+     xlim = range(bac.pcoa$points[, 1]),  
+     ylim = range(bac.pcoa$points[, 2]),  
      xlab = paste("PCoA 1 (", 34.5, "%)", sep = ""),
      ylab = paste("PCoA 2 (", 13.1, "%)", sep = ""),
-     pch = pch_map, cex = 2.0, col = point_colors,
+     pch = pch_map, cex = 1.5, col = point_colors,
      type = "n", cex.lab = 1.5, cex.axis = 1.2, axes = FALSE)
 axis(side = 1, labels = TRUE, lwd.ticks = 2, cex.axis = 1.2, las = 1)
 axis(side = 2, labels = TRUE, lwd.ticks = 2, cex.axis = 1.2, las = 1)
 abline(h = 0, v = 0, lty = 3)  
-points(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], 
-       pch = pch_map, cex = 2, bg = "gray", col = point_colors)
-text(bac.pcoa.rd$points[, 1], bac.pcoa.rd$points[, 2], labels = point_name)
+points(bac.pcoa$points[, 1], bac.pcoa$points[, 2], 
+       pch = pch_map, cex = 1.5, bg = "gray", col = point_colors)
 names(habitat_colors) <- c("Arable", "Forest", "Grassland", "Settlement")
-legend("bottomleft", legend = names(habitat_colors), 
+legend(x = -0.45, y = -0.4, legend = names(habitat_colors), 
        col = habitat_colors, 
        pch = 16, 
-       cex = 0.5, # Smaller text 
-       pt.cex = 0.5, 
+       cex = 0.7, # Smaller text 
+       pt.cex = 0.7, 
        bty = "n")
-legend(x = -0.3, y = -0.25, legend = levels(factor(ldsp)), 
+legend(x = -0.3, y = -0.4, legend = levels(factor(ldsp)), 
        pch = pch_val, 
        col = "black",
-       cex = 0.5,
-       pt.cex = 0.5,
+       cex = 0.7,
+       pt.cex = 0.7,
        bty = "n")
 
 ```
 
-
 In the above graph, color represets habitat tyepe, and shapre represents landscape 
-type. From that, we hypothesize that bacterial diversity is affected by landscape 
-type, but likely not so much by habitat type. 
+type. 
 
 ## Hypothesis testing:
 ### PERMANOVA:
@@ -212,6 +269,7 @@ mantel(bac.bc, env.ds)
 ```
 
 Correlation is only 0.05, which is very weak. 
+
 
 ### Constriant ordination:
 Let's take a look at the dbRDA: 
@@ -257,15 +315,14 @@ axis(side = 1, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
 axis(side = 2, labels = T, lwd.ticks = 2, cex.axis = 1.2, las = 1)
 abline(h = 0, v = 0, lty = 3)
 box(lwd = 2)
-points(bac.dbrda$CA$u, pch = 19, cex = 1, bg = "gray", 
-       col = "gray")
-text(bac.dbrda$CA$u, 
-     labels = substr(row.names(bac.dbrda$CA$u), 1, 4))
+points(bac.dbrda$CA$u, pch = pch_map, cex = 1, bg = "gray", 
+       col = habitat_colors)
 bc.vectors <- coef(bac.dbrda)
+rownames(bc.vectors) <- c("MAP", "MAT", "MLT", "Forest")
 arrows(0, 0, bc.vectors[, 1], bc.vectors[, 2],
-       lwd = 2, lty = 1, length = 0.2, col = "blue")
+       lwd = 2, lty = 1, length = 0.1, col = "black")
 text(bc.vectors[, 1], bc.vectors[, 2], pos = 3, 
-     labels = row.names(bc.vectors), col = "blue")
+     labels = row.names(bc.vectors), col = "black")
 axis(side = 3, lwd.ticks = 2, cex.axis = 1.2, las = 1, col = "red", 
      lwd = 2.2, at = pretty(range(bc.vectors[, 1])) * 2, 
      labels = pretty(range(bc.vectors[, 1])))
